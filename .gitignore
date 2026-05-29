@@ -10,3 +10,4 @@ data/events/
 *.mp4
 *.zip
 *.pt
+.venv_ci/

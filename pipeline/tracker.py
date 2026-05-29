@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import hashlib
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -38,7 +38,8 @@ class SessionManager:
         self._exited: list[ExitedVisitor] = []
 
     def new_visitor_id(self) -> str:
-        token = f"VIS_{hashlib.sha1(str(self._next_token).encode()).hexdigest()[:6]}"
+        # Use UUIDv4-based token to avoid weak-hash security warnings
+        token = f"VIS_{uuid.uuid4().hex[:8]}"
         self._next_token += 1
         return token
 
