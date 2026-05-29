@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Store Intelligence — Live Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f0a14;
+      --card: #1a1224;
+      --accent: #9b59b6;
+      --accent2: #e056fd;
+      --text: #f5eef8;
+      --muted: #a894b8;
+      --ok: #2ecc71;
+      --warn: #f39c12;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(circle at top, #241734, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    h1 { font-size: 1.6rem; font-weight: 600; }
+    .badge {
+      background: var(--accent);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .badge.live { background: #c0392b; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.65; } }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid #2d1f3d;
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .card label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+    }
+    .card .value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent2);
+      transition: color 0.3s, transform 0.3s;
+    }
+    .card .value.flash { color: var(--ok); transform: scale(1.05); }
+    .meta { color: var(--muted); font-size: 0.85rem; margin-top: 1rem; }
+    .log {
+      background: var(--card);
+      border-radius: 12px;
+      border: 1px solid #2d1f3d;
+      padding: 1rem;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+    }
+    .log div { padding: 0.2rem 0; color: var(--muted); }
+    .log div strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Store Intelligence — Live Dashboard</h1>
+    <span class="badge live" id="status">CONNECTING</span>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <label>Unique Visitors</label>
+      <div class="value" id="visitors">—</div>
+    </div>
+    <div class="card">
+      <label>Conversion Rate</label>
+      <div class="value" id="conversion">—</div>
+    </div>
+    <div class="card">
+      <label>Queue Depth</label>
+      <div class="value" id="queue">—</div>
+    </div>
+    <div class="card">
+      <label>Abandonment Rate</label>
+      <div class="value" id="abandon">—</div>
+    </div>
+  </div>
+
+  <p class="meta" id="meta">Waiting for live metrics…</p>
+
+  <div class="log" id="log"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const storeId = params.get("store_id") || "STORE_BLR_002";
+    const date = params.get("date") || "2026-03-03";
+    const streamUrl = `/dashboard/stream?store_id=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`;
+
+    const els = {
+      status: document.getElementById("status"),
+      visitors: document.getElementById("visitors"),
+      conversion: document.getElementById("conversion"),
+      queue: document.getElementById("queue"),
+      abandon: document.getElementById("abandon"),
+      meta: document.getElementById("meta"),
+      log: document.getElementById("log"),
+    };
+
+    function flash(el) {
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 600);
+    }
+
+    function appendLog(text) {
+      const row = document.createElement("div");
+      row.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> — ${text}`;
+      els.log.prepend(row);
+    }
+
+    function renderMetrics(payload) {
+      const m = payload.metrics;
+      if (!m) return;
+      els.visitors.textContent = m.unique_visitors;
+      els.conversion.textContent = (m.conversion_rate * 100).toFixed(1) + "%";
+      els.queue.textContent = m.queue_depth;
+      els.abandon.textContent = (m.abandonment_rate * 100).toFixed(1) + "%";
+      els.meta.textContent = `Store ${m.store_id} · ${m.date} · source: ${payload.source}`;
+      [els.visitors, els.conversion, els.queue, els.abandon].forEach(flash);
+      appendLog(`Metrics updated (${payload.source}) — visitors=${m.unique_visitors}, conversion=${(m.conversion_rate*100).toFixed(1)}%`);
+    }
+
+    const source = new EventSource(streamUrl);
+    source.onopen = () => {
+      els.status.textContent = "LIVE";
+      appendLog(`Connected to ${streamUrl}`);
+    };
+    source.onmessage = (event) => {
+      try {
+        renderMetrics(JSON.parse(event.data));
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    source.onerror = () => {
+      els.status.textContent = "RECONNECTING";
+    };
+  </script>
+</body>
+</html>
