@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:///./data/store_intelligence.db
+      LOG_LEVEL: INFO
+    restart: unless-stopped

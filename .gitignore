@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.db
+.env
+.venv/
+venv/
+data/*.db
+data/clips/
+data/events/
+*.mp4
+*.zip
+*.pt
