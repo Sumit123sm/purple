@@ -58,3 +58,35 @@ store-intelligence/
 ├── docker-compose.yml
 └── Dockerfile
 ```
+
+## Dashboard Quickstart
+
+Stream sample events into the running API and open the live dashboard.
+
+PowerShell (Windows):
+
+```powershell
+# set PYTHONPATH for package imports (current session)
+$env:PYTHONPATH='.'
+
+# run the dashboard streamer (uses tests/fixtures/sample_events.jsonl by default)
+python dashboard/run.py
+
+# or use the provided helper
+.\.scripts\run_dashboard.ps1
+```
+
+POSIX / WSL / macOS:
+
+```bash
+export PYTHONPATH="${PYTHONPATH:-.}"
+./.scripts/run_dashboard.sh
+```
+
+Then open the dashboard URL printed by the streamer, for example:
+
+http://127.0.0.1:8000/dashboard?store_id=STORE_BLR_002&date=2026-03-03
+
+Notes:
+- The wrappers set `PYTHONPATH` so `python dashboard/run.py` can import the `dashboard` package when run from the repo root.
+- Use `docker compose up --build` to run the API in a container; the helper works inside the container too if the workspace is copied into `/app`.
