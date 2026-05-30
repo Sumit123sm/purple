@@ -14,6 +14,7 @@ data/events/
 *.pyo
 *.pyd
 .Python
+CCTV Footage/
 
 # Keep small test fixtures (do commit these)
 !data/store_layout.json
@@ -42,4 +43,3 @@ htmlcov/
 
 # Misc binaries
 *.tar.gz
-sumit.md

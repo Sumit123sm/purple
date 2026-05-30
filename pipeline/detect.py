@@ -105,14 +105,15 @@ def extract_frame_detections(
                     detections.append(Detection(track_id, cx, cy, conf, crop))
         else:
             # Synthetic fallback for CPU-only/demo runs when ultralytics isn't installed.
-            # Generate a deterministic moving detection every N frames to simulate a person.
-            import numpy as _np
-
-            h, w = frame.shape[:2]
-            # one synthetic track moving horizontally across the frame
-            speed = max(1, int(max(1, w / 100)))
-            cx = ((frame_index % (w // speed)) * speed + speed / 2) / w
-            cy = 0.5
+            # Generate deterministic movement that can cross configured entry lines.
+            cycle = max(20, int(settings.default_fps * 6))
+            phase = frame_index % cycle
+            progress = phase / float(cycle - 1)
+            cx = 0.15 + 0.7 * progress
+            if phase < cycle // 2:
+                cy = 0.2 + 0.7 * (phase / float((cycle // 2) - 1))
+            else:
+                cy = 0.9 - 0.7 * ((phase - (cycle // 2)) / float((cycle // 2) - 1))
             track_id = 1
             conf = float(max(0.3, settings.min_detection_confidence))
             detections.append(Detection(track_id, float(cx), float(cy), conf, None))

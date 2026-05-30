@@ -1,3 +1,7 @@
+# PROMPT: Write tests for structured request logging middleware to verify trace_id propagation,
+# endpoint field correctness, latency presence, and JSON log payload parsing for observability.
+# CHANGES MADE: Kept assertions focused on emitted JSON fields and retained caplog parsing.
+
 import json
 import logging
 
