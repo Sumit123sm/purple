@@ -7,6 +7,15 @@ from pathlib import Path
 
 import httpx
 
+# When `dashboard/run.py` is executed as a script (e.g. `python dashboard/run.py`),
+# Python does not automatically add the project root to `sys.path`, which makes
+# `from dashboard...` imports fail with ModuleNotFoundError. Ensure the repo
+# root is on `sys.path` so the package imports work whether the module is run
+# as `python -m dashboard.run` or `python dashboard/run.py`.
+if __package__ is None:  # running as a script
+    repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root))
+
 from dashboard.stream_replay import main_async
 
 
