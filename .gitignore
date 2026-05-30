@@ -11,3 +11,35 @@ data/events/
 *.zip
 *.pt
 .venv_ci/
+*.pyo
+*.pyd
+.Python
+
+# Keep small test fixtures (do commit these)
+!data/store_layout.json
+!data/pos_transactions.csv
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Logs
+*.log
+
+# Misc binaries
+*.tar.gz
+sumit.md
