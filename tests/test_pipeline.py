@@ -12,6 +12,7 @@ from uuid import UUID
 import pytest
 
 from app.models import StoreEvent
+from pipeline.detect import _MotionTracker
 from pipeline.emit import EventEmitter, load_events_jsonl, write_events_jsonl
 from pipeline.layout import infer_store_camera_from_filename, load_store_layout
 from pipeline.processor import ClipProcessor, Detection, FramePacket
@@ -115,3 +116,22 @@ class TestLayoutHelpers:
         floor = next(cam for cam in store["cameras"] if cam["camera_id"] == "CAM_FLOOR_01")
         zones = zones_at_point(0.2, 0.5, floor["zones"])
         assert zones[0]["zone_id"] == "SKINCARE"
+
+
+class TestMotionFallbackTracker:
+    def test_tracker_keeps_identity_for_nearby_motion(self):
+        tracker = _MotionTracker(max_misses=3, max_distance_px=40.0)
+        first = tracker.update([(100, 100, 20, 60)])
+        assert len(first) == 1
+        track_id = first[0][0]
+
+        second = tracker.update([(108, 102, 20, 60)])
+        assert len(second) == 1
+        assert second[0][0] == track_id
+
+    def test_tracker_drops_stale_tracks_after_misses(self):
+        tracker = _MotionTracker(max_misses=1, max_distance_px=40.0)
+        tracker.update([(50, 60, 18, 50)])
+        tracker.update([])
+        tracker.update([])
+        assert tracker.tracks == {}

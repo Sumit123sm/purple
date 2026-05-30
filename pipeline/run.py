@@ -4,13 +4,14 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import httpx
 
 from pipeline.config import PipelineSettings
 from pipeline.detect import discover_clips, process_video_file
 from pipeline.emit import write_events_jsonl
-from pipeline.layout import infer_store_camera_from_filename, load_store_layout
+from pipeline.layout import get_store_config, load_store_layout
 from pipeline.replay import replay_events
 
 
@@ -30,9 +31,102 @@ def ingest_to_api(events: list[dict], api_url: str, batch_size: int = 500) -> No
             )
 
 
+def _load_clip_map(clip_map_path: str | None) -> dict[str, dict[str, str]]:
+    if not clip_map_path:
+        return {}
+
+    path = Path(clip_map_path)
+    if not path.exists():
+        raise FileNotFoundError(f"clip map file not found: {path}")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    mapping: dict[str, dict[str, str]] = {}
+
+    if isinstance(payload, list):
+        for item in payload:
+            filename = str(item["filename"]).strip()
+            mapping[filename] = {
+                "store_id": str(item["store_id"]).strip(),
+                "camera_id": str(item["camera_id"]).strip(),
+            }
+        return mapping
+
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if isinstance(value, dict):
+                mapping[str(key).strip()] = {
+                    "store_id": str(value["store_id"]).strip(),
+                    "camera_id": str(value["camera_id"]).strip(),
+                }
+        return mapping
+
+    raise ValueError("clip map must be a JSON list or object")
+
+
+def _resolve_nonstandard_clips(
+    clips_dir: Path,
+    layout: dict[str, Any],
+    clip_map_path: str | None,
+    default_store_id: str | None,
+    default_camera_id: str | None,
+) -> list[tuple[Path, str, str]]:
+    videos = sorted(clips_dir.rglob("*.mp4"))
+    if not videos:
+        return []
+
+    mapping = _load_clip_map(clip_map_path)
+    resolved: list[tuple[Path, str, str]] = []
+    unresolved: list[str] = []
+
+    store_camera_cycle: list[str] = []
+    if default_store_id and not default_camera_id:
+        store_cfg = get_store_config(layout, default_store_id)
+        store_camera_cycle = [camera["camera_id"] for camera in store_cfg.get("cameras", [])]
+
+    for index, video_path in enumerate(videos):
+        hit = mapping.get(video_path.name)
+        if not hit:
+            hit = mapping.get(video_path.stem)
+
+        if hit:
+            resolved.append((video_path, hit["store_id"], hit["camera_id"]))
+            continue
+
+        if default_store_id and default_camera_id:
+            resolved.append((video_path, default_store_id, default_camera_id))
+            continue
+
+        if default_store_id and store_camera_cycle:
+            camera_id = store_camera_cycle[index % len(store_camera_cycle)]
+            resolved.append((video_path, default_store_id, camera_id))
+            continue
+
+        unresolved.append(video_path.name)
+
+    if unresolved:
+        sample = ", ".join(unresolved[:3])
+        raise ValueError(
+            "Unable to resolve store/camera IDs for clips. "
+            "Provide --clip-map or --default-store-id with optional --default-camera-id. "
+            f"Unresolved examples: {sample}"
+        )
+
+    return resolved
+
+
 def run_video_mode(settings: PipelineSettings, args: argparse.Namespace) -> list[dict]:
     layout = load_store_layout(settings.layout_path)
     clips = discover_clips(settings.clips_dir)
+
+    if not clips:
+        clips = _resolve_nonstandard_clips(
+            settings.clips_dir,
+            layout,
+            args.clip_map,
+            args.default_store_id,
+            args.default_camera_id,
+        )
+
     if not clips:
         raise FileNotFoundError(
             f"No clips found in {settings.clips_dir}. Place CCTV mp4 files there or use --mode replay."
@@ -72,6 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clips-dir", default="data/clips")
     parser.add_argument("--replay-source", default="tests/fixtures/sample_events.jsonl")
     parser.add_argument("--store-id", default=None)
+    parser.add_argument("--clip-map", default=None, help="JSON mapping for non-standard clip names")
+    parser.add_argument("--default-store-id", default=None, help="Fallback store ID for non-standard clip names")
+    parser.add_argument("--default-camera-id", default=None, help="Fallback camera ID for all clips when clip names are non-standard")
     parser.add_argument("--device", default="cpu", help="Device to run detection on, e.g. 'cpu' or 'cuda:0'")
     parser.add_argument("--api-url", default=None, help="If set, POST events to running API")
     parser.add_argument("--max-frames", type=int, default=None, help="Limit frames per clip (debug)")

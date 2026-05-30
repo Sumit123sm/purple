@@ -8,7 +8,7 @@ Purplle Tech Challenge 2026 — Round 2 submission.
 git clone <repo-url> store-intelligence && cd store-intelligence
 pip install -r requirements.txt
 pytest
-docker compose up --build
+docker compose up -d --build
 curl http://localhost:8000/health
 ```
 
@@ -24,7 +24,7 @@ curl http://localhost:8000/health
 | 6 | Done | Anomalies (`GET /stores/{id}/anomalies`) — queue spike, conversion drop, dead zone |
 | 7 | Done | Enhanced `/health` — per-store feed status, STALE_FEED warnings |
 | 8 | Done | Detection pipeline (`pipeline/`) — YOLO + replay mode |
-| 9 | Pending | Live dashboard |
+| 9 | Done | Live dashboard (`/dashboard`) + SSE streamer (`dashboard/run.py`) |
 
 ## Detection pipeline
 
@@ -46,6 +46,56 @@ python -m pipeline.run --mode replay --api-url http://localhost:8000
 
 Place challenge clips in `data/clips/` using filenames like `STORE_BLR_002_CAM_ENTRY_01.mp4`.
 Output events are written to `data/events/output.jsonl`.
+
+If your clips are in `CCTV Footage/` with names like `CAM 1.mp4`, run with fallback mapping:
+
+```bash
+python -m pipeline.run --mode video --clips-dir "CCTV Footage" --default-store-id STORE_BLR_002 --max-frames 300
+```
+
+For exact camera mapping, create a JSON file and pass `--clip-map`:
+
+```json
+[
+	{"filename":"CAM 1.mp4","store_id":"STORE_BLR_002","camera_id":"CAM_ENTRY_01"},
+	{"filename":"CAM 2.mp4","store_id":"STORE_BLR_002","camera_id":"CAM_FLOOR_01"},
+	{"filename":"CAM 3.mp4","store_id":"STORE_BLR_002","camera_id":"CAM_BILLING_01"}
+]
+```
+
+```bash
+python -m pipeline.run --mode video --clips-dir "CCTV Footage" --clip-map data/clip_map.json
+```
+
+## Module-by-module run order
+
+1. Detection module
+
+```bash
+python -m pipeline.run --mode video --clips-dir "CCTV Footage" --default-store-id STORE_BLR_002 --max-frames 300
+```
+
+2. API module
+
+```bash
+docker compose up -d --build
+```
+
+3. Ingestion module (pipeline to API)
+
+```bash
+python -m pipeline.run --mode replay --api-url http://127.0.0.1:8000
+```
+
+4. Metrics and health module checks
+
+```bash
+curl http://127.0.0.1:8000/stores/STORE_BLR_002/metrics
+curl http://127.0.0.1:8000/stores/STORE_BLR_002/funnel
+curl http://127.0.0.1:8000/stores/STORE_BLR_002/heatmap
+curl http://127.0.0.1:8000/stores/STORE_BLR_002/anomalies
+curl http://127.0.0.1:8000/health
+```
 
 ## Project structure
 
@@ -89,4 +139,9 @@ http://127.0.0.1:8000/dashboard?store_id=STORE_BLR_002&date=2026-03-03
 
 Notes:
 - The wrappers set `PYTHONPATH` so `python dashboard/run.py` can import the `dashboard` package when run from the repo root.
-- Use `docker compose up --build` to run the API in a container; the helper works inside the container too if the workspace is copied into `/app`.
+- Use `docker compose up -d --build` to run the API in a container; the helper works inside the container too if the workspace is copied into `/app`.
+
+## Submission hygiene
+
+- Do not commit dataset or CCTV video files.
+- `*.mp4`, `data/clips/`, and `CCTV Footage/` should remain ignored.
