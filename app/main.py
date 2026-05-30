@@ -52,11 +52,20 @@ app.include_router(dashboard_router)
 repo_root = Path(__file__).resolve().parents[1]
 dashboard_static = repo_root / "dashboard" / "static"
 if dashboard_static.exists():
+    # Mount dashboard assets under an internal static prefix so API routes
+    # (for example `/dashboard/stream`) are not shadowed by the static file handler.
     app.mount(
-        "/dashboard",
+        "/_dashboard_static",
         StaticFiles(directory=str(dashboard_static), html=True),
-        name="dashboard",
+        name="dashboard_static",
     )
+
+    # Serve the dashboard index at /dashboard by returning the static index.html
+    from fastapi.responses import FileResponse
+
+    @app.get("/dashboard")
+    async def dashboard_index() -> FileResponse:
+        return FileResponse(dashboard_static / "index.html")
 
 
 @app.get("/")
