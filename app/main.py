@@ -17,6 +17,7 @@ from app.routes.health import router as health_router
 from app.routes.heatmap import router as heatmap_router
 from app.routes.ingest import router as ingest_router
 from app.routes.metrics import router as metrics_router
+from app.routes.dashboard import router as dashboard_router
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ app.include_router(metrics_router)
 app.include_router(funnel_router)
 app.include_router(heatmap_router)
 app.include_router(anomalies_router)
+app.include_router(dashboard_router)
 
 # Serve the dashboard static UI at /dashboard (index.html will be served)
 repo_root = Path(__file__).resolve().parents[1]
