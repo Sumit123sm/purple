@@ -1,10 +1,13 @@
 import logging
 import time
 import uuid
+import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import dispose_db, init_db
@@ -43,6 +46,21 @@ app.include_router(funnel_router)
 app.include_router(heatmap_router)
 app.include_router(anomalies_router)
 
+# Serve the dashboard static UI at /dashboard (index.html will be served)
+repo_root = Path(__file__).resolve().parents[1]
+dashboard_static = repo_root / "dashboard" / "static"
+if dashboard_static.exists():
+    app.mount(
+        "/dashboard",
+        StaticFiles(directory=str(dashboard_static), html=True),
+        name="dashboard",
+    )
+
+
+@app.get("/")
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/dashboard")
+
 
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
@@ -51,17 +69,18 @@ async def request_logging_middleware(request: Request, call_next):
     start = time.perf_counter()
     response = await call_next(request)
     latency_ms = round((time.perf_counter() - start) * 1000, 2)
-    log_fields = (
-        f"trace_id={trace_id} "
-        f"store_id={getattr(request.state, 'store_id', '-')} "
-        f"endpoint={request.url.path} "
-        f"latency_ms={latency_ms} "
-        f"status_code={response.status_code}"
-    )
+    log_data = {
+        "trace_id": trace_id,
+        "store_id": getattr(request.state, "store_id", None),
+        "endpoint": request.url.path,
+        "latency_ms": latency_ms,
+        "status_code": response.status_code,
+    }
     event_count = getattr(request.state, "event_count", None)
     if event_count is not None:
-        log_fields += f" event_count={event_count}"
-    logger.info("request %s", log_fields)
+        log_data["event_count"] = event_count
+    # Emit structured JSON message prefixed with 'request ' for backward compatibility
+    logger.info("request %s", json.dumps(log_data, default=str))
     response.headers["X-Trace-Id"] = trace_id
     return response
 
