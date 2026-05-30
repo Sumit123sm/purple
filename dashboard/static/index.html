@@ -116,6 +116,7 @@
     const storeId = params.get("store_id") || "STORE_BLR_002";
     const date = params.get("date") || "2026-03-03";
     const streamUrl = `/dashboard/stream?store_id=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`;
+    const pollUrl = `/stores/${encodeURIComponent(storeId)}/metrics?date=${encodeURIComponent(date)}`;
 
     const els = {
       status: document.getElementById("status"),
@@ -150,21 +151,23 @@
       appendLog(`Metrics updated (${payload.source}) — visitors=${m.unique_visitors}, conversion=${(m.conversion_rate*100).toFixed(1)}%`);
     }
 
-    const source = new EventSource(streamUrl);
-    source.onopen = () => {
-      els.status.textContent = "LIVE";
-      appendLog(`Connected to ${streamUrl}`);
-    };
-    source.onmessage = (event) => {
+    // Polling fallback: fetch metrics every second and update UI.
+    async function pollOnce() {
       try {
-        renderMetrics(JSON.parse(event.data));
-      } catch (e) {
-        console.error(e);
+        const r = await fetch(pollUrl, {cache: 'no-store'});
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        const metrics = await r.json();
+        renderMetrics({ metrics, source: 'poll' });
+        els.status.textContent = "LIVE";
+      } catch (err) {
+        els.status.textContent = "RECONNECTING";
+        appendLog(`Poll error: ${err}`);
       }
-    };
-    source.onerror = () => {
-      els.status.textContent = "RECONNECTING";
-    };
+    }
+
+    // Initial poll + interval
+    pollOnce();
+    setInterval(pollOnce, 1000);
   </script>
 </body>
 </html>
