@@ -72,6 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clips-dir", default="data/clips")
     parser.add_argument("--replay-source", default="tests/fixtures/sample_events.jsonl")
     parser.add_argument("--store-id", default=None)
+    parser.add_argument("--device", default="cpu", help="Device to run detection on, e.g. 'cpu' or 'cuda:0'")
     parser.add_argument("--api-url", default=None, help="If set, POST events to running API")
     parser.add_argument("--max-frames", type=int, default=None, help="Limit frames per clip (debug)")
     return parser
@@ -86,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         clips_dir=Path(args.clips_dir),
         layout_path=Path(args.layout),
         output_path=Path(args.output),
+        device=args.device,
     )
 
     try:
