@@ -38,5 +38,12 @@ async def dashboard_stream(
                 await asyncio.sleep(1.0)
         except asyncio.CancelledError:
             return
+        except Exception as exc:  # pragma: no cover - defensive logging for runtime
+            import traceback, sys
+
+            traceback.print_exc(file=sys.stderr)
+            err = {"error": "stream_failure", "message": str(exc)}
+            yield f"data: {json.dumps(err)}\n\n"
+            return
 
     return EventSourceResponse(event_publisher())
