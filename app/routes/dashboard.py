@@ -25,7 +25,14 @@ async def dashboard_stream(
         # This keeps the demo working without requiring a separate pub/sub hub.
         try:
             while True:
-                metrics = await compute_store_metrics(db, store_id, target_date)
+                try:
+                    metrics = await compute_store_metrics(db, store_id, target_date)
+                except Exception as exc:
+                    # Yield an error event and stop the stream.
+                    err = {"error": "metrics_error", "message": str(exc)}
+                    yield f"data: {json.dumps(err)}\n\n"
+                    return
+
                 # Server-Sent Events expect text/event-stream; send JSON payload.
                 payload = json.dumps(metrics.model_dump(), default=str)
                 yield f"data: {payload}\n\n"
