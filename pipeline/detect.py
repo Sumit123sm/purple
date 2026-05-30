@@ -105,18 +105,28 @@ def extract_frame_detections(
                     detections.append(Detection(track_id, cx, cy, conf, crop))
         else:
             # Synthetic fallback for CPU-only/demo runs when ultralytics isn't installed.
-            # Generate deterministic movement that can cross configured entry lines.
+            # Generate deterministic multi-person movement that can cross entry lines
+            # and create zone/queue behavior across different camera layouts.
             cycle = max(20, int(settings.default_fps * 6))
-            phase = frame_index % cycle
-            progress = phase / float(cycle - 1)
-            cx = 0.15 + 0.7 * progress
-            if phase < cycle // 2:
-                cy = 0.2 + 0.7 * (phase / float((cycle // 2) - 1))
-            else:
-                cy = 0.9 - 0.7 * ((phase - (cycle // 2)) / float((cycle // 2) - 1))
-            track_id = 1
-            conf = float(max(0.3, settings.min_detection_confidence))
-            detections.append(Detection(track_id, float(cx), float(cy), conf, None))
+            if cycle < 4:
+                cycle = 4
+
+            offsets = (0, cycle // 5, (2 * cycle) // 5)
+            for index, offset in enumerate(offsets, start=1):
+                phase = (frame_index + offset) % cycle
+                progress = phase / float(cycle - 1)
+                cx = 0.1 + 0.8 * progress
+
+                half_cycle = cycle // 2
+                if phase < half_cycle:
+                    down_progress = phase / float(max(1, half_cycle - 1))
+                    cy = 0.15 + 0.75 * down_progress
+                else:
+                    up_progress = (phase - half_cycle) / float(max(1, half_cycle - 1))
+                    cy = 0.9 - 0.75 * up_progress
+
+                conf = float(max(0.3, settings.min_detection_confidence + (0.02 * index)))
+                detections.append(Detection(index, float(cx), float(cy), conf, None))
 
         yield FramePacket(frame_index, detections)
         frame_index += 1

@@ -79,6 +79,9 @@ class ClipProcessor:
                 elif crossing == "EXIT" and track.visitor_id:
                     self._end_visit(track, packet.frame_index, confidence)
 
+            if not self.entry_line and track.visitor_id is None:
+                self._start_visit(track, packet.frame_index, confidence, det)
+
             if track.visitor_id:
                 self._update_zones(track, packet.frame_index, confidence, det.cx, det.cy)
 
